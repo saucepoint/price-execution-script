@@ -18,6 +18,7 @@ import {IPositionManager} from "@uniswap/v4-periphery/src/interfaces/IPositionMa
 import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
 import {PositionInfoLibrary} from "@uniswap/v4-periphery/src/libraries/PositionInfoLibrary.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+import {PathKey} from "hookmate/interfaces/router/IUniswapV4Router04.sol";
 
 import {EasyPosm} from "./utils/libraries/EasyPosm.sol";
 import {Deployers} from "./utils/Deployers.sol";
@@ -45,9 +46,17 @@ contract EulerSwapQuoteTest is Test, Deployers {
         currency1: Currency.wrap(address(0x4200000000000000000000000000000000000006)),
         fee: 500,
         tickSpacing: 1,
-        hooks: IHooks(address(0xe1c24AB8d2dE8e58326b86B320b591B2FB41A8A8))
+        hooks: IHooks(address(0x9219C75d28A165BFaBaDbA4a96aCa23e0d0C68A8))
     });
     PoolKey poolKey1;
+
+    PoolKey ethWrapperKey = PoolKey({
+        currency0: CurrencyLibrary.ADDRESS_ZERO,
+        currency1: Currency.wrap(address(0x4200000000000000000000000000000000000006)),
+        fee: 0,
+        tickSpacing: 1,
+        hooks: IHooks(address(0x730b109Bad65152C67ECC94eB8b0968603dbA888))
+    });
 
     function setUp() public {
         vm.createSelectFork("unichain");
@@ -60,8 +69,8 @@ contract EulerSwapQuoteTest is Test, Deployers {
 
         currency0 = poolKey0.currency0;
         currency1 = poolKey0.currency1;
-        deal(Currency.unwrap(currency0), address(poolManager), 10_000_000e6);
-        deal(Currency.unwrap(currency1), address(poolManager), 10_000e18);
+        // deal(Currency.unwrap(currency0), address(poolManager), 10_000_000e6);
+        // deal(Currency.unwrap(currency1), address(poolManager), 10_000e18);
         deal(Currency.unwrap(currency0), address(this), 10_000_000e6);
         deal(Currency.unwrap(currency1), address(this), 10_000e18);
         IERC20(Currency.unwrap(currency0)).approve(address(swapRouter), type(uint256).max);
@@ -101,9 +110,9 @@ contract EulerSwapQuoteTest is Test, Deployers {
         console2.log("Swap 0: ", uint256(int256(swapDelta0.amount1())));
         console2.log("Swap 1: ", uint256(int256(swapDelta1.amount0())));
 
-        swapDelta0.amount1() < swapDelta1.amount0() ? 
-            console2.log("Pool 1 produced more output tokens for zeroForOne swaps") :
-            console2.log("Pool 0 produced more output tokens for zeroForOne swaps");
+        swapDelta0.amount1() < swapDelta1.amount0()
+            ? console2.log("Pool 1 produced more output tokens for zeroForOne swaps")
+            : console2.log("Pool 0 produced more output tokens for zeroForOne swaps");
     }
 
     function test_oneForZero() public {
@@ -133,9 +142,56 @@ contract EulerSwapQuoteTest is Test, Deployers {
         console2.log("Swap 0: ", uint256(int256(swapDelta0.amount0())));
         console2.log("Swap 1: ", uint256(int256(swapDelta1.amount1())));
 
-        swapDelta0.amount0() < swapDelta1.amount1() ? 
-            console2.log("Pool 1 produced more output tokens for oneForZero swaps") :
-            console2.log("Pool 0 produced more output tokens for oneForZero swaps");
+        swapDelta0.amount0() < swapDelta1.amount1()
+            ? console2.log("Pool 1 produced more output tokens for oneForZero swaps")
+            : console2.log("Pool 0 produced more output tokens for oneForZero swaps");
+    }
+
+    function test_oneForZero_weth() public {
+        uint256 amountIn = 0.1e18;
+        bool zeroForOne = false;
+
+        PathKey[] memory path = new PathKey[](2);
+        path[0] = PathKey({
+            intermediateCurrency: ethWrapperKey.currency1,
+            fee: ethWrapperKey.fee,
+            tickSpacing: ethWrapperKey.tickSpacing,
+            hooks: ethWrapperKey.hooks,
+            hookData: Constants.ZERO_BYTES
+        });
+        path[1] = PathKey({
+            intermediateCurrency: poolKey0.currency0, // (USDC)
+            fee: poolKey0.fee,
+            tickSpacing: poolKey0.tickSpacing,
+            hooks: poolKey0.hooks,
+            hookData: Constants.ZERO_BYTES
+        });
+
+        BalanceDelta swapDelta0 = swapRouter.swapExactTokensForTokens{value: amountIn}({
+            amountIn: amountIn,
+            amountOutMin: 0, // Very bad, but we want to allow for unlimited price impact
+            startCurrency: CurrencyLibrary.ADDRESS_ZERO,
+            path: path,
+            receiver: address(this),
+            deadline: block.timestamp + 1
+        });
+
+        BalanceDelta swapDelta1 = swapRouter.swapExactTokensForTokens{value: amountIn}({
+            amountIn: amountIn,
+            amountOutMin: 0, // Very bad, but we want to allow for unlimited price impact
+            zeroForOne: !zeroForOne,
+            poolKey: poolKey1,
+            hookData: Constants.ZERO_BYTES,
+            receiver: address(this),
+            deadline: block.timestamp + 1
+        });
+
+        console2.log("Swap 0: ", uint256(int256(swapDelta0.amount0())));
+        console2.log("Swap 1: ", uint256(int256(swapDelta1.amount1())));
+
+        swapDelta0.amount0() < swapDelta1.amount1()
+            ? console2.log("Pool 1 produced more output tokens for oneForZero swaps")
+            : console2.log("Pool 0 produced more output tokens for oneForZero swaps");
     }
 
     receive() external payable {}

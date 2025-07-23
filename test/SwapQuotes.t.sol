@@ -56,7 +56,6 @@ contract SwapQuoteTest is Test, Deployers {
         deal(Currency.unwrap(currency1), address(this), 10_000e18);
         IERC20(Currency.unwrap(currency1)).approve(address(swapRouter), type(uint256).max);
 
-
         assertTrue(poolKey0.currency1 == currency1, "PoolKey currency1 mismatch");
         assertTrue(poolKey1.currency1 == currency1, "PoolKey currency1 mismatch");
 
@@ -99,9 +98,9 @@ contract SwapQuoteTest is Test, Deployers {
         console2.log("Swap 0: ", uint256(int256(swapDelta0.amount1())));
         console2.log("Swap 1: ", uint256(int256(swapDelta1.amount1())));
 
-        swapDelta0.amount1() < swapDelta1.amount1() ? 
-            console2.log("Pool 1 produced more output tokens for zeroForOne swaps") :
-            console2.log("Pool 0 produced more output tokens for zeroForOne swaps");
+        swapDelta0.amount1() < swapDelta1.amount1()
+            ? console2.log("Pool 1 produced more output tokens for zeroForOne swaps")
+            : console2.log("Pool 0 produced more output tokens for zeroForOne swaps");
     }
 
     function test_oneForZero() public {
@@ -131,9 +130,9 @@ contract SwapQuoteTest is Test, Deployers {
         console2.log("Swap 0: ", uint256(int256(swapDelta0.amount0())));
         console2.log("Swap 1: ", uint256(int256(swapDelta1.amount0())));
 
-        swapDelta0.amount0() < swapDelta1.amount0() ? 
-            console2.log("Pool 1 produced more output tokens for oneForZero swaps") :
-            console2.log("Pool 0 produced more output tokens for oneForZero swaps");
+        swapDelta0.amount0() < swapDelta1.amount0()
+            ? console2.log("Pool 1 produced more output tokens for oneForZero swaps")
+            : console2.log("Pool 0 produced more output tokens for oneForZero swaps");
     }
 
     receive() external payable {}
